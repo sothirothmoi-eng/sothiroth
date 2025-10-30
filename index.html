@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Responsive QR Code Generator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Load Inter font -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap" rel="stylesheet">
+    <!-- QR Code Library (davidshimjs/qrcodejs) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <style>
+        /* Custom styles for the app */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8fafc;
+        }
+        /* Style for the QR code container */
+        #qr-preview {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 1rem;
+            background-color: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            /* This ensures the QR canvas is centered inside */
+        }
+        /* Custom styling for the generated QR canvas/div */
+        #qr-preview > div {
+            border: 4px solid #3b82f6; /* Blue border around the QR */
+            border-radius: 8px;
+            overflow: hidden; /* To handle canvas/image content */
+        }
+        /* Ensure the logo is properly positioned over the QR */
+        .qr-canvas-wrapper {
+            position: relative;
+            display: inline-block;
+        }
+        .logo-overlay {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 30%; /* Logo size relative to QR code */
+            height: 30%;
+            border-radius: 10px;
+            object-fit: contain;
+            pointer-events: none; /* Allows clicks to pass through */
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8 min-h-screen">
+
+    <div class="max-w-4xl mx-auto">
+        <header class="text-center mb-8">
+            <h1 class="text-3xl md:text-4xl font-extrabold text-blue-600 mb-2">ប្រព័ន្ធបង្កើត QR Code</h1>
+            <p class="text-gray-500">បង្កើតកូដ QR លក្ខណធម្មតា ឬមាន Logo</p>
+        </header>
+
+        <!-- Tab Navigation -->
+        <div class="flex border-b border-gray-200 mb-6">
+            <button id="tab-simple" onclick="switchMode('simple')" class="py-3 px-4 font-semibold text-sm transition-colors duration-200 rounded-t-lg"
+                    style="border-bottom: 3px solid transparent;">
+                បង្កើត​ QR Code ធម្មតា
+            </button>
+            <button id="tab-branded" onclick="switchMode('branded')" class="py-3 px-4 font-semibold text-sm transition-colors duration-200 rounded-t-lg"
+                    style="border-bottom: 3px solid transparent;">
+                Branded QR (with Logo)
+            </button>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <!-- Input Panel (Col 1 & 2 on Desktop, Full Width on Mobile) -->
+            <div class="lg:col-span-2 bg-white p-6 rounded-xl shadow-lg">
+
+                <!-- Simple Mode Panel -->
+                <div id="panel-simple" class="space-y-4">
+                    <h2 class="text-xl font-semibold text-gray-700">Simple QR Generation</h2>
+                    <p class="text-sm text-gray-500">Generate a standard QR code from a URL or text.</p>
+
+                    <label for="simple-link" class="block text-sm font-medium text-gray-700 mt-4">Link or Text Content:</label>
+                    <input type="url" id="simple-link" name="simple-link" placeholder="https://yourwebsite.com"
+                           class="w-full p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 transition duration-150">
+
+                    <button onclick="handleGenerate('simple')"
+                            class="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-4 rounded-xl shadow-md transition duration-150 transform hover:scale-[1.01] active:scale-[0.99]">
+                        Generate Simple QR
+                    </button>
+                </div>
+
+                <!-- Branded Mode Panel -->
+                <div id="panel-branded" class="space-y-4 hidden">
+                    <h2 class="text-xl font-semibold text-gray-700">Branded QR Generation</h2>
+                    <p class="text-sm text-gray-500">Embed your logo in the center of the QR code.</p>
+
+                    <label for="branded-link" class="block text-sm font-medium text-gray-700 mt-4">Link or Text Content:</label>
+                    <input type="url" id="branded-link" name="branded-link" placeholder="https://yourwebsite.com"
+                           class="w-full p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 transition duration-150">
+
+                    <label for="logo-upload" class="block text-sm font-medium text-gray-700 pt-2">Upload Logo (PNG/JPG):</label>
+                    <input type="file" id="logo-upload" accept="image/png, image/jpeg"
+                           class="w-full p-3 border border-gray-300 rounded-lg bg-gray-50 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 transition duration-150">
+                    <img id="logo-preview" class="hidden w-20 h-20 rounded-lg object-contain border p-1" alt="Logo Preview">
+
+                    <button onclick="handleGenerate('branded')"
+                            class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-4 rounded-xl shadow-md transition duration-150 transform hover:scale-[1.01] active:scale-[0.99]">
+                        Generate Branded QR
+                    </button>
+                </div>
+
+                <div id="message-box" class="mt-4 p-3 bg-red-100 text-red-700 rounded-lg hidden"></div>
+            </div>
+
+            <!-- Preview Panel (Col 3 on Desktop, Full Width on Mobile) -->
+            <div class="lg:col-span-1">
+                <div class="bg-white p-6 rounded-xl shadow-lg h-full flex flex-col items-center justify-start">
+                    <h2 class="text-xl font-semibold text-gray-700 mb-4">QR Code Preview</h2>
+                    <!-- QR Code Output Area -->
+                    <div id="qr-preview" class="w-full max-w-[300px] h-auto aspect-square mb-4">
+                        <p class="text-gray-400 text-center">Enter content and click 'Generate'.</p>
+                    </div>
+
+                    <!-- Download Button -->
+                    <button id="download-btn" onclick="downloadQR()"
+                            class="w-full max-w-[300px] bg-indigo-500 hover:bg-indigo-600 text-white font-bold py-3 px-4 rounded-xl shadow-md transition duration-150 disabled:bg-gray-400" disabled>
+                        Download QR Code (PNG)
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global state
+        let currentMode = 'simple';
+        let logoDataUrl = null;
+        const qrSize = 300; // Fixed size for generation consistency
+
+        // --- Utility Functions ---
+
+        /** Global Error/Message Display */
+        function showMessage(msg, type = 'error') {
+            const box = document.getElementById('message-box');
+            box.textContent = msg;
+            box.className = `mt-4 p-3 rounded-lg ${type === 'error' ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`;
+            box.style.display = 'block';
+            // Auto hide after 5 seconds
+            setTimeout(() => { box.style.display = 'none'; }, 5000);
+        }
+
+        /** Converts uploaded file to a Data URL for drawing */
+        function loadLogo(file) {
+            return new Promise((resolve, reject) => {
+                if (!file) {
+                    resolve(null);
+                    return;
+                }
+                const reader = new FileReader();
+                reader.onload = (e) => resolve(e.target.result);
+                reader.onerror = (e) => reject('Failed to read logo file.');
+                reader.readAsDataURL(file);
+            });
+        }
+
+        /**
+         * Embeds the logo onto the center of the QR canvas.
+         * Returns a Promise that resolves when the image is fully drawn.
+         */
+        function embedLogo(canvas, logoDataUrl) {
+            return new Promise((resolve) => {
+                const ctx = canvas.getContext('2d');
+                const qrWidth = canvas.width;
+                const logoSize = qrWidth * 0.3; // Logo is 30% of the QR code size
+                const logoX = (qrWidth - logoSize) / 2;
+                const logoY = (qrWidth - logoSize) / 2;
+
+                // Clear the center area for the logo (optional, but good practice)
+                ctx.fillStyle = 'white';
+                ctx.fillRect(logoX, logoY, logoSize, logoSize);
+
+                const img = new Image();
+                img.onload = () => {
+                    // Draw logo
+                    ctx.drawImage(img, logoX, logoY, logoSize, logoSize);
+                    // Draw a subtle border around the logo for better visibility
+                    ctx.strokeStyle = '#ddd';
+                    ctx.lineWidth = 4;
+                    ctx.strokeRect(logoX, logoY, logoSize, logoSize);
+                    resolve(); // Crucial: Resolve the promise once drawing is complete
+                };
+                img.onerror = () => {
+                    showMessage('Error loading logo image onto canvas. Proceeding without logo.', 'error');
+                    resolve(); // Resolve even on error to allow the rest of the app to continue
+                };
+                img.src = logoDataUrl;
+            });
+        }
+
+        /** Main QR Generation Logic */
+        async function generateQR(link, logoDataUrl = null) {
+            const container = document.getElementById('qr-preview');
+            const downloadBtn = document.getElementById('download-btn');
+
+            // 1. Clear previous QR content
+            container.innerHTML = '';
+            downloadBtn.disabled = true;
+
+            if (!link) {
+                showMessage('Please enter a link or text content.', 'error');
+                container.innerHTML = '<p class="text-gray-400 text-center">Content required to generate QR.</p>';
+                return;
+            }
+
+            try {
+                // 2. Generate new QR using qrcode.js
+                // qrcode.js generates a <div> containing a <canvas> element.
+                const qr = new QRCode(container, {
+                    text: link,
+                    width: qrSize,
+                    height: qrSize,
+                    colorDark: "#000000",
+                    colorLight: "#ffffff",
+                    correctLevel: QRCode.CorrectLevel.H // High correction level for logo embedding
+                });
+
+                // Wait for the QR code to be rendered (it's synchronous, but a tiny delay can help)
+                await new Promise(r => setTimeout(r, 50));
+
+                const canvasElement = container.querySelector('canvas');
+                if (canvasElement) {
+                    // 3. Embed logo if provided: WE NOW WAIT FOR THE LOGO TO DRAW
+                    if (logoDataUrl) {
+                        await embedLogo(canvasElement, logoDataUrl);
+                    }
+
+                    // 4. Enable download button (only after logo is drawn)
+                    downloadBtn.disabled = false;
+                } else {
+                    showMessage('QR code failed to render. Please check your content.', 'error');
+                }
+
+            } catch (error) {
+                console.error("QR Generation Error:", error);
+                showMessage('An unexpected error occurred during QR generation.', 'error');
+            }
+        }
+
+        // --- Event Handlers ---
+
+        function switchMode(mode) {
+            currentMode = mode;
+            const simplePanel = document.getElementById('panel-simple');
+            const brandedPanel = document.getElementById('panel-branded');
+            const simpleTab = document.getElementById('tab-simple');
+            const brandedTab = document.getElementById('tab-branded');
+
+            if (mode === 'simple') {
+                simplePanel.classList.remove('hidden');
+                brandedPanel.classList.add('hidden');
+                simpleTab.style.borderBottom = '3px solid #3b82f6';
+                simpleTab.classList.add('text-blue-600');
+                brandedTab.style.borderBottom = '3px solid transparent';
+                brandedTab.classList.remove('text-blue-600');
+            } else {
+                simplePanel.classList.add('hidden');
+                brandedPanel.classList.remove('hidden');
+                brandedTab.style.borderBottom = '3px solid #3b82f6';
+                brandedTab.classList.add('text-blue-600');
+                simpleTab.style.borderBottom = '3px solid transparent';
+                simpleTab.classList.remove('text-blue-600');
+            }
+
+            // Clear messages on mode switch
+            document.getElementById('message-box').style.display = 'none';
+        }
+
+        async function handleGenerate(mode) {
+            if (mode === 'simple') {
+                const link = document.getElementById('simple-link').value.trim();
+                generateQR(link);
+            } else if (mode === 'branded') {
+                const link = document.getElementById('branded-link').value.trim();
+                const fileInput = document.getElementById('logo-upload');
+                const file = fileInput.files[0];
+
+                if (!file && link) {
+                    // Generate branded without logo
+                    generateQR(link);
+                } else if (file) {
+                    try {
+                        const logo = await loadLogo(file);
+                        logoDataUrl = logo; // Update global state
+                        generateQR(link, logoDataUrl);
+                    } catch (e) {
+                        showMessage(e, 'error');
+                        return;
+                    }
+                } else {
+                    showMessage('Please enter content and optionally upload a logo.', 'error');
+                }
+            }
+        }
+
+        function downloadQR() {
+            const container = document.getElementById('qr-preview');
+            const canvas = container.querySelector('canvas');
+
+            if (!canvas) {
+                showMessage('No QR code available to download.', 'error');
+                return;
+            }
+
+            // Create a temporary link element
+            const link = document.createElement('a');
+            link.download = `qrcode_${currentMode}_${Date.now()}.png`;
+            link.href = canvas.toDataURL('image/png');
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            showMessage('QR code downloaded!', 'success');
+        }
+
+        // --- Initialization ---
+
+        window.onload = function() {
+            // Set initial tab state
+            switchMode('simple');
+
+            // Logo file input change listener for preview
+            document.getElementById('logo-upload').addEventListener('change', function(event) {
+                const preview = document.getElementById('logo-preview');
+                const file = event.target.files[0];
+
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        preview.src = e.target.result;
+                        preview.classList.remove('hidden');
+                    };
+                    reader.readAsDataURL(file);
+                } else {
+                    preview.src = '';
+                    preview.classList.add('hidden');
+                }
+            });
+        };
+    </script>
+</body>
+</html>
